@@ -16,9 +16,43 @@ const unsigned long breathingDelay = 150;
 unsigned long breathingDelays[NUM_PIXELS]; // create an array of breathing delays, one for each LED
 uint32_t fadeStartColors[NUM_PIXELS];
 uint32_t fadeEndColors[NUM_PIXELS];
-unsigned long fadeStartTimes[NUM_PIXELS] = {0};
+unsigned long fadeStartTimes[NUM_PIXELS];
+unsigned long fadeDuration = 500;
 
+uint32_t mixColors(uint32_t col1, uint32_t col2, float factor) {
+  float red = ((col1 >> 16) & 0xFF) * (1 - factor) + ((col2 >> 16) & 0xFF) * factor;
+  float green = ((col1 >> 8) & 0xFF) * (1 - factor) + ((col2 >> 8) & 0xFF) * factor;
+  float blue = (col1 & 0xFF) * (1 - factor) + (col2 & 0xFF) * factor;
+  return pixels.Color(red, green, blue);
+}
 
+uint32_t lerpColor(uint32_t color1, uint32_t color2, float t) {
+  uint8_t r1 = (color1 >> 16) & 0xFF;
+  uint8_t g1 = (color1 >> 8) & 0xFF;
+  uint8_t b1 = color1 & 0xFF;
+
+  uint8_t r2 = (color2 >> 16) & 0xFF;
+  uint8_t g2 = (color2 >> 8) & 0xFF;
+  uint8_t b2 = color2 & 0xFF;
+
+  uint8_t r = r1 + (r2 - r1) * t;
+  uint8_t g = g1 + (g2 - g1) * t;
+  uint8_t b = b1 + (b2 - b1) * t;
+
+  return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+}
+
+uint32_t scaleColor(uint32_t color, float scale) {
+  uint8_t r = (color >> 16) & 0xFF;
+  uint8_t g = (color >> 8) & 0xFF;
+  uint8_t b = color & 0xFF;
+
+  r = r * scale;
+  g = g * scale;
+  b = b * scale;
+
+  return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
+}
 
 void setup() {
   pixels.begin();
@@ -76,37 +110,8 @@ void loop() {
     case 3:
   // Red and blue mode with random twinkling and breathing
   for (int i = 0; i < NUM_PIXELS; i++) {
-    unsigned long currentTime = millis();
-
-    // Fade duration (milliseconds)
-    int fadeDuration = 500;
-
-    // Breathing effect duration (milliseconds)
-    int breathingDuration = 2000;
-
-    // Apply the breathing effect on top of the current color
-    uint32_t currentColor = pixels.getPixelColor(i);
-    uint8_t r = (currentColor >> 16) & 0xFF;
-    uint8_t g = (currentColor >> 8) & 0xFF;
-    uint8_t b = currentColor & 0xFF;
-    float brightnessMultiplier = 0.5 + 0.5 * sin(2 * PI * currentTime / (float)breathingDuration);
-    uint8_t newR = r * brightnessMultiplier;
-    uint8_t newG = g * brightnessMultiplier;
-    uint8_t newB = b * brightnessMultiplier;
-    pixels.setPixelColor(i, newR, newG, newB);
-
-    // Perform the fade transition
-    unsigned long elapsedFadeTime = currentTime - fadeStartTimes[i];
-    if (elapsedFadeTime < fadeDuration) {
-      uint32_t startColor = fadeStartColors[i];
-      uint32_t endColor = fadeEndColors[i];
-
-      float progress = (float)elapsedFadeTime / fadeDuration;
-      uint8_t newR = (((startColor >> 16) & 0xFF) * (1 - progress)) + (((endColor >> 16) & 0xFF) * progress);
-      uint8_t newG = (((startColor >> 8) & 0xFF) * (1 - progress)) + (((endColor >> 8) & 0xFF) * progress);
-      uint8_t newB = ((startColor & 0xFF) * (1 - progress)) + ((endColor & 0xFF) * progress);
-      pixels.setPixelColor(i, newR, newG, newB);
-    } else if (currentTime - lastBreathing[i] > breathingDelays[i]) {
+    unsigned long now = millis();
+    if (now - lastBreathing[i] > breathingDelays[i]) {
       // Determine if the LED should twinkle to the other color
       bool twinkle = random(0, 100) < 5; // 5% chance to twinkle
 
@@ -117,15 +122,27 @@ void loop() {
         // Determine the target color based on the current color
         uint32_t targetColor = ((currentColor >> 16) & 0xFF) > 0 ? pixels.Color(0, 0, 255) : pixels.Color(255, 0, 0);
 
-        // Update the start and end colors for the fade transition
+        // Initialize the fade variables
+        fadeStartTimes[i] = now;
         fadeStartColors[i] = currentColor;
         fadeEndColors[i] = targetColor;
 
         // Set a new random breathing time for this LED
-        int holdTime = random(1000, 5000); // random hold time between 1 and 5 seconds
-        breathingDelays[i] = holdTime;
-        lastBreathing[i] = currentTime;
-        fadeStartTimes[i] = currentTime;
+        breathingDelays[i] = random(1000, 5000); // random hold time between 1 and 5 seconds
+        lastBreathing[i] = now;
+      }
+    }
+
+    // Apply the fade and breathing effect
+    if (fadeStartTimes[i] > 0) {
+      float fadeProgress = float(now - fadeStartTimes[i]) / float(fadeDuration);
+      if (fadeProgress < 1.0) {
+        uint32_t newColor = lerpColor(fadeStartColors[i], fadeEndColors[i], fadeProgress);
+        float brightnessScale = 0.5 + 0.5 * sin(2 * PI * now / 2000.0);
+        pixels.setPixelColor(i, scaleColor(newColor, brightnessScale));
+      } else {
+        fadeStartTimes[i] = 0;
+        pixels.setPixelColor(i, fadeEndColors[i]);
       }
     }
   }
