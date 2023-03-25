@@ -1,5 +1,10 @@
 #include <Adafruit_NeoPixel.h>
 
+/*---------------------*/
+//THE BELOW SECTION IS WHAT PINS YOU'RE USING
+//NEOPIXEL PIN IS WHICHEVER IS GOING TO THE DATA PIN
+//BUTTON PIN IS FOR THE BUTTON, THE OTHER SIDE OF THE BUTTON GOES TO GND
+
 // Pin configurations
 #define NEOPIXEL_PIN 2
 #define BUTTON_PIN 8
@@ -21,7 +26,12 @@ const uint8_t MIN_BRIGHTNESS_CASE_3 = 0;  // Separate minimum brightness setting
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUM_PIXELS, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 
-uint8_t mode = 0;
+
+/****************/
+//THIS CAN BE SET TO CHANGE THE DEFAULT MODE IF YOU DONT WANT A BUTTON YET
+uint8_t mode = 0; //CHANGE THE 0 TO 1, 2, OR 3
+/****************/
+
 uint32_t lastButtonPressTime = 0;
 uint32_t lastUpdate = 0;
 bool colorChanged[NUM_PIXELS];
